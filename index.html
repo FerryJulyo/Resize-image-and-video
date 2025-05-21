@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Image & Video Compressor</title>
+<style>
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #f0f0f0;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+  }
+  header {
+    background: rgba(0,0,0,0.3);
+    padding: 1rem 2rem;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+  }
+  header h1 {
+    margin: 0;
+    font-weight: 700;
+    font-size: 2.2rem;
+    letter-spacing: 2px;
+    text-shadow: 1px 1px 4px #00000088;
+  }
+  main {
+    flex: 1;
+    width: 100%;
+    max-width: 900px;
+    padding: 2rem;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    margin: 2rem 1rem 3rem;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+  }
+  h2 {
+    font-weight: 600;
+    margin-bottom: 1rem;
+    text-align: center;
+    text-shadow: 1px 1px 3px #000000cc;
+  }
+  label {
+    font-weight: 500;
+    color: #e0e0e0;
+    display: block;
+    margin: 1rem 0 0.5rem;
+  }
+  input[type="file"] {
+    width: 100%;
+    padding: 0.5rem;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+  }
+  select, input[type=range], button {
+    width: 100%;
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    border: none;
+    font-size: 1rem;
+    margin: 0.6rem 0 1rem;
+    background: #7658a3cc;
+    color: white;
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+  select:hover, button:hover, input[type=range]:hover {
+    background: #9671c9cc;
+  }
+  output {
+    display: block;
+    margin-top: -0.5rem;
+    margin-bottom: 1rem;
+    font-weight: 600;
+  }
+  .section {
+    margin-bottom: 2rem;
+  }
+  .progress-bar {
+    width: 100%;
+    background-color: #a097ba55;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+    height: 18px;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: #9a6ed9;
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+  footer {
+    text-align: center;
+    padding: 1rem;
+    color: #cfcfcf;
+    font-size: 0.9rem;
+    user-select: none;
+  }
+  .notice {
+    margin: 0.5rem 0 1rem;
+    background: #9a4c4ccc;
+    border-radius: 10px;
+    padding: 0.7rem 1rem;
+    font-weight: 600;
+    color: #ffd6d6;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Image & Video Compressor</h1>
+</header>
+<main>
+  <section class="section" id="image-section">
+    <h2>Compress Image</h2>
+    <label for="image-input">Select Image (JPEG, PNG)</label>
+    <input type="file" id="image-input" accept="image/*" />
+    <label for="resize-range">Resize Percentage: <output id="resize-value">100%</output></label>
+    <input type="range" id="resize-range" min="10" max="100" value="100" />
+    <label for="quality-range">Quality (JPEG only): <output id="quality-value">90%</output></label>
+    <input type="range" id="quality-range" min="10" max="100" value="90" />
+    <button id="compress-image-btn" disabled>Compress Image</button>
+    <div id="image-result" style="margin-top:1rem;"></div>
+  </section>
+
+  <section class="section" id="video-section">
+    <h2>Compress Video</h2>
+    <div id="video-warning" class="notice" style="display:none;">
+      <strong>Video compression requires your browser to support <code>SharedArrayBuffer</code>.</strong><br/>
+      Please run this page on a secure local server with proper cross-origin isolation headers (Cross-Origin-Opener-Policy and Cross-Origin-Embedder-Policy) to enable video compression.
+    </div>
+    <label for="video-input">Select Video (MP4, WebM)</label>
+    <input type="file" id="video-input" accept="video/*" />
+    <label for="video-crf-range">Quality (CRF) 10=best, 51=worst: <output id="video-crf-value">28</output></label>
+    <input type="range" id="video-crf-range" min="10" max="51" value="28" />
+    <button id="compress-video-btn" disabled>Compress Video</button>
+    <div class="progress-bar" id="video-progress" style="display:none;">
+      <div class="progress-bar-fill" id="video-progress-fill"></div>
+    </div>
+    <div id="video-result" style="margin-top:1rem;"></div>
+  </section>
+</main>
+<footer>
+  &copy; 2024 Image & Video Compressor. Client-side only, your files stay private.
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.3/dist/ffmpeg.min.js"></script>
+<script src="server.js"></script>
+<script>
+  // Image Compression Section
+  const imageInput = document.getElementById('image-input');
+  const compressImageBtn = document.getElementById('compress-image-btn');
+  const resizeRange = document.getElementById('resize-range');
+  const resizeValue = document.getElementById('resize-value');
+  const qualityRange = document.getElementById('quality-range');
+  const qualityValue = document.getElementById('quality-value');
+  const imageResult = document.getElementById('image-result');
+
+  let imageFile = null;
+
+  imageInput.addEventListener('change', e => {
+    if (e.target.files && e.target.files.length > 0) {
+      imageFile = e.target.files[0];
+      compressImageBtn.disabled = false;
+      imageResult.innerHTML = '';
+    } else {
+      imageFile = null;
+      compressImageBtn.disabled = true;
+      imageResult.innerHTML = '';
+    }
+  });
+
+  resizeRange.addEventListener('input', () => {
+    resizeValue.textContent = resizeRange.value + '%';
+  });
+
+  qualityRange.addEventListener('input', () => {
+    qualityValue.textContent = qualityRange.value + '%';
+  });
+
+  compressImageBtn.addEventListener('click', () => {
+    if (!imageFile) return;
+    compressImageBtn.disabled = true;
+    imageResult.innerHTML = `<p style="color:#ccc;">Compressing...</p>`;
+
+    const reader = new FileReader();
+    reader.onload = function(event) {
+      const img = new Image();
+      img.onload = function() {
+        // Resize
+        const canvas = document.createElement('canvas');
+        const scale = resizeRange.value / 100;
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        // Determine mime type
+        let mimeType = imageFile.type;
+        if (!mimeType) mimeType = 'image/jpeg';
+
+        // Quality for jpeg only
+        let quality = qualityRange.value / 100;
+        if (!mimeType.includes('jpeg') && !mimeType.includes('jpg')) {
+          quality = 1; // quality ignored for png or others
+          mimeType = 'image/png'; // force png for others
+        }
+
+        canvas.toBlob(function(blob) {
+          if (!blob) {
+            imageResult.innerHTML = `<p style="color:#f88;">Error compressing image.</p>`;
+            compressImageBtn.disabled = false;
+            return;
+          }
+          // Preview compressed image and download link
+          const compressedURL = URL.createObjectURL(blob);
+          const originalMB = (imageFile.size/1024/1024).toFixed(2);
+          const compressedMB = (blob.size/1024/1024).toFixed(2);
+          imageResult.innerHTML = `
+            <p>Original size: ${originalMB} MB<br />
+            Compressed size: ${compressedMB} MB</p>
+            <img src="${compressedURL}" alt="Compressed Image" style="max-width:100%; border-radius:8px; box-shadow: 0 0 15px #9a6ed9cc; margin-bottom: 0.5rem;" />
+            <a href="${compressedURL}" download="compressed_${imageFile.name}" style="color:#fff; text-decoration:none; font-weight:600; background: #8e6adecc; padding: 0.5rem 1rem; border-radius: 6px; display: inline-block;">Download Compressed Image</a>
+          `;
+          compressImageBtn.disabled = false;
+        }, mimeType, quality);
+      };
+      img.onerror = function() {
+        imageResult.innerHTML = `<p style="color:#f88;">Error loading image.</p>`;
+        compressImageBtn.disabled = false;
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(imageFile);
+  });
+
+  // Video Compression Section
+  const { createFFmpeg, fetchFile } = FFmpeg;
+  const ffmpeg = createFFmpeg({ log: false });
+
+  const videoInput = document.getElementById('video-input');
+  const compressVideoBtn = document.getElementById('compress-video-btn');
+  const videoCrfRange = document.getElementById('video-crf-range');
+  const videoCrfValue = document.getElementById('video-crf-value');
+  const videoResult = document.getElementById('video-result');
+  const videoProgress = document.getElementById('video-progress');
+  const videoProgressFill = document.getElementById('video-progress-fill');
+  const videoWarning = document.getElementById('video-warning');
+
+  let videoFile = null;
+
+  // Check if SharedArrayBuffer is available
+  const sharedArrayBufferSupported = typeof SharedArrayBuffer !== 'undefined';
+  if (!sharedArrayBufferSupported) {
+    // Disable video compression features and show warning
+    videoWarning.style.display = 'block';
+    videoInput.disabled = true;
+    compressVideoBtn.disabled = true;
+    videoCrfRange.disabled = true;
+  }
+
+  videoInput.addEventListener('change', e => {
+    if (e.target.files && e.target.files.length > 0) {
+      videoFile = e.target.files[0];
+      compressVideoBtn.disabled = !sharedArrayBufferSupported;
+      videoResult.innerHTML = '';
+      videoProgress.style.display = 'none';
+      videoProgressFill.style.width = '0%';
+    } else {
+      videoFile = null;
+      compressVideoBtn.disabled = true;
+      videoResult.innerHTML = '';
+      videoProgress.style.display = 'none';
+      videoProgressFill.style.width = '0%';
+    }
+  });
+
+  videoCrfRange.addEventListener('input', () => {
+    videoCrfValue.textContent = videoCrfRange.value;
+  });
+
+  compressVideoBtn.addEventListener('click', async () => {
+    if (!videoFile) return;
+    compressVideoBtn.disabled = true;
+    videoResult.innerHTML = `<p style="color:#ccc;">Loading FFmpeg core...</p>`;
+    videoProgress.style.display = 'block';
+    videoProgressFill.style.width = '0%';
+
+    try {
+      if (!ffmpeg.isLoaded()) {
+        await ffmpeg.load();
+      }
+      videoResult.innerHTML = `<p style="color:#ccc;">Processing video, please wait...</p>`;
+
+      const inputName = 'input_video';
+      const outputName = 'output_video.mp4';
+      ffmpeg.FS('writeFile', inputName, await fetchFile(videoFile));
+
+      // Using CRF to control quality. Lower value = better quality, default 28
+      // We'll convert any video to mp4 with libx264 codec.
+      await ffmpeg.run(
+        '-i', inputName,
+        '-vcodec', 'libx264',
+        '-crf', videoCrfRange.value,
+        '-preset', 'fast',
+        '-movflags', 'faststart',
+        outputName
+      );
+
+      const data = ffmpeg.FS('readFile', outputName);
+
+      const compressedBlob = new Blob([data.buffer], { type: 'video/mp4' });
+      const compressedURL = URL.createObjectURL(compressedBlob);
+
+      const originalMB = (videoFile.size / 1024 / 1024).toFixed(2);
+      const compressedMB = (compressedBlob.size / 1024 / 1024).toFixed(2);
+
+      videoResult.innerHTML = `
+        <p>Original size: ${originalMB} MB<br />
+        Compressed size: ${compressedMB} MB</p>
+        <video controls style="max-width:100%; border-radius: 10px; box-shadow: 0 0 15px #9a6ed9cc; margin-bottom:0.5rem;">
+          <source src="${compressedURL}" type="video/mp4" />
+          Your browser does not support the video tag.
+        </video>
+        <a href="${compressedURL}" download="compressed_${videoFile.name.replace(/\.[^.]+$/, '.mp4')}" style="color:#fff; text-decoration:none; font-weight:600; background: #8e6adecc; padding: 0.5rem 1rem; border-radius: 6px; display: inline-block;">Download Compressed Video</a>
+      `;
+
+    } catch (e) {
+      videoResult.innerHTML = `<p style="color:#f88;">Error compressing video: ${e.message}</p>`;
+    } finally {
+      videoProgress.style.display = 'none';
+      compressVideoBtn.disabled = false;
+    }
+  });
+
+</script>
+</body>
+</html>
+
